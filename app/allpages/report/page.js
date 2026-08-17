@@ -71,8 +71,18 @@ const Reports = () => {
     //   const logsData = useUserLogsTotal((state) => state.userLogsTotal)
     // const logsData = useUserLogsData((state) => state.userLogsData)
 
-    const ordersState = useUserOrders((state) => state.userOrders);
-    const orders = Array.isArray(ordersState) ? ordersState : [];
+const ordersState = useUserOrders((state) => state.userOrders);
+
+// Orders is now the approved-and-received list — all downstream code
+// (filters, displayedOrders, exports) uses this automatically, no changes needed.
+const orders = useMemo(() => {
+    const raw = Array.isArray(ordersState) ? ordersState : [];
+    return raw.filter(
+        (o) =>
+            o.Approved && o.Approved !== "N/A" &&
+            o.Received && o.Received !== "N/A"
+    );
+}, [ordersState]);
 
     // ===== ORDERS: time filter + view toggle (NEW) =====
     const [filteredOrders, setFilteredOrders] = useState(null); // null = no filter applied yet, show all
@@ -1268,22 +1278,23 @@ const Reports = () => {
     );
 
     // NEW: per-employee item quantity breakdown for orders, e.g. Brian - Maize x3
-    const orderEmployeeItemSales = useMemo(() => {
-        const map = {};
-        displayedOrders.forEach((order) => {
-            const emp = order.EmployeeID || "Unknown";
-            if (!map[emp]) map[emp] = {};
-            (order.Cart || []).forEach((item) => {
-                const name = item.Name || "N/A";
-                if (map[emp][name]) {
-                    map[emp][name].stock += Number(item.stock) || 0;
-                } else {
-                    map[emp][name] = { name, stock: Number(item.stock) || 0 };
-                }
-            });
+// NEW: per-employee item quantity breakdown for orders, e.g. Brian - Maize x3
+const orderEmployeeItemSales = useMemo(() => {
+    const map = {};
+    displayedOrders.forEach((order) => {
+        const emp = order.Received || "Unknown"; // group by who RECEIVED the order
+        if (!map[emp]) map[emp] = {};
+        (order.Cart || []).forEach((item) => {
+            const name = item.Name || "N/A";
+            if (map[emp][name]) {
+                map[emp][name].stock += Number(item.stock) || 0;
+            } else {
+                map[emp][name] = { name, stock: Number(item.stock) || 0 };
+            }
         });
-        return map;
-    }, [displayedOrders]);
+    });
+    return map;
+}, [displayedOrders]);
 
     const downloadOrdersExcel = () => {
         const today = new Date();
@@ -2432,7 +2443,7 @@ const Reports = () => {
                                         <tr>
                                             <th className={`border px-2 py-1 text-xs sm:text-sm w-10 ${theme === "Dark" ? "border-blue-700" : "border-gray-300"}`}>#</th>
                                             <th className={`border px-2 py-1 text-xs sm:text-sm ${theme === "Dark" ? "border-blue-700" : "border-gray-300"}`}>Order #</th>
-                                            <th className={`border px-2 py-1 text-xs sm:text-sm ${theme === "Dark" ? "border-blue-700" : "border-gray-300"}`}>Employee</th>
+                                            <th className={`border px-2 py-1 text-xs sm:text-sm ${theme === "Dark" ? "border-blue-700" : "border-gray-300"}`}>Order Request Employee</th>
                                             <th className={`border px-2 py-1 text-xs sm:text-sm max-w-[250px] ${theme === "Dark" ? "border-blue-700" : "border-gray-300"}`}>Items</th>
                                             <th className={`border px-2 py-1 text-xs sm:text-sm ${theme === "Dark" ? "border-blue-700" : "border-gray-300"}`}>Approved</th>
                                             <th className={`border px-2 py-1 text-xs sm:text-sm ${theme === "Dark" ? "border-blue-700" : "border-gray-300"}`}>Received</th>
@@ -2518,7 +2529,7 @@ const Reports = () => {
                                     <thead className={`${theme === "Dark" ? "bg-blue-800 text-white" : "bg-blue-600 text-white"}`}>
                                         <tr>
                                             <th className={`border px-2 py-1 text-xs sm:text-sm ${theme === "Dark" ? "border-blue-700" : "border-gray-300"}`}>
-                                                Employee
+                                                Employee received the order
                                             </th>
                                             <th className={`border px-2 py-1 text-xs sm:text-sm ${theme === "Dark" ? "border-blue-700" : "border-gray-300"}`}>
                                                 Item
